@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package main;
+
+service Counter {
+  rpc IncrementCounter(stream CounterValue) returns (stream CounterValue) {}
+}
+
+message CounterValue {
+  int32 count = 1;
+}

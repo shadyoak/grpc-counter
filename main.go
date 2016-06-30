@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net"
 
@@ -12,33 +13,25 @@ const (
 	port = ":5001"
 )
 
-type counterServer struct{}
+type CounterServer struct {
+	CurrentCount int
+}
 
-func (s *counterServer) IncrementCounter(stream service.Counter_IncrementCounterServer) error {
-	// for {
-	// 	in, err := stream.Recv()
-	// 	if err == io.EOF {
-	// 		return nil
-	// 	}
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	key := serialize(in.Location)
-	// 	if _, present := s.routeNotes[key]; !present {
-	// 		s.routeNotes[key] = []*pb.RouteNote{in}
-	// 	} else {
-	// 		s.routeNotes[key] = append(s.routeNotes[key], in)
-	// 	}
-	// 	for _, note := range s.routeNotes[key] {
-	// 		if err := stream.Send(note); err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// }
-	c := service.CounterValue{2}
-	log.Println(c)
+func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounterServer) error {
+	for {
 
-	return nil
+		in, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		key := in.Count
+		log.Println(s.CurrentCount, key)
+
+		if err := stream.Send(&service.CounterValue{key}); err != nil {
+			return err
+		}
+
+	}
 }
 
 func main() {
@@ -47,7 +40,7 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	service.RegisterCounterServer(s, &counterServer{})
-	log.Println("Listenting on port", port)
+	service.RegisterCounterServer(s, &CounterServer{})
+	log.Println("Listening on port", port)
 	s.Serve(lis)
 }

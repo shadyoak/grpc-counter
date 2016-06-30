@@ -1,1 +1,1 @@
-protoc --go_out=plugins=grpc:. "counter.proto"
+protoc --go_out=plugins=grpc:. "service/*.proto"

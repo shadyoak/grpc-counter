@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/shadyoak/grpc-counter/service"
 	"google.golang.org/grpc"
 )
 
@@ -13,7 +14,7 @@ const (
 
 type counterServer struct{}
 
-func (s *counterServer) IncrementCounter(Counter_IncrementCounterServer) error {
+func (s *counterServer) IncrementCounter(stream service.Counter_IncrementCounterServer) error {
 	// for {
 	// 	in, err := stream.Recv()
 	// 	if err == io.EOF {
@@ -34,6 +35,8 @@ func (s *counterServer) IncrementCounter(Counter_IncrementCounterServer) error {
 	// 		}
 	// 	}
 	// }
+	c := service.CounterValue{2}
+	log.Println(c)
 
 	return nil
 }
@@ -44,7 +47,7 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	RegisterCounterServer(s, &counterServer{})
+	service.RegisterCounterServer(s, &counterServer{})
 	log.Println("Listenting on port", port)
 	s.Serve(lis)
 }

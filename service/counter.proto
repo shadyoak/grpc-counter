@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package main;
+package service;
 
 service Counter {
   rpc IncrementCounter(stream CounterValue) returns (stream CounterValue) {}

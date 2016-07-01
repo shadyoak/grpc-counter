@@ -58,8 +58,8 @@ func testCounter(client service.CounterClient) {
 			grpclog.Fatalf("failed to send a count: %v", err)
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	//<-waitc
+	<-waitc
 }

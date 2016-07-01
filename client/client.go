@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	address = "localhost:5001"
+	address = "localhost:5000"
 )
 
 func main() {
@@ -29,8 +29,12 @@ func testCounter(client service.CounterClient) {
 
 	stream, err := client.IncrementCounter(context.Background())
 	if err != nil {
-		grpclog.Fatalf("%v.IncrementCounter(_) = _, %v", client, err)
+		grpclog.Fatalf("unable to create stream: %v", err)
 	}
+	defer func() {
+		grpclog.Println("closing stream...")
+		stream.CloseSend()
+	}()
 
 	waitc := make(chan struct{})
 
@@ -49,14 +53,13 @@ func testCounter(client service.CounterClient) {
 	}(waitc)
 
 	for i := 0; i < 10; i++ {
-		c := &service.CounterValue{int32(i)}
+		c := &service.CounterValue{int32(1)}
 		if err := stream.Send(c); err != nil {
 			grpclog.Fatalf("failed to send a count: %v", err)
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 	}
 
-	stream.CloseSend()
-	<-waitc
+	//<-waitc
 }

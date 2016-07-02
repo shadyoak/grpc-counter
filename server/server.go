@@ -11,62 +11,17 @@ import (
 )
 
 type CounterServer struct {
-	ClientChan chan error
-	Clients    []service.Counter_IncrementCounterServer
-	Counter    Counter
-	Port       int
-}
-
-func (s *CounterServer) addClient(stream service.Counter_IncrementCounterServer) {
-	go func() {
-		s.Clients = append(s.Clients, stream)
-		s.ClientChan <- nil
-	}()
-	<-s.ClientChan
-
-	log.Println("client connected:", stream)
-}
-
-func (s *CounterServer) removeClient(stream service.Counter_IncrementCounterServer) {
-	go func() {
-		clients := s.Clients
-		newClients := clients[:0]
-		for _, c := range clients {
-			if c != stream {
-				newClients = append(newClients, c)
-			}
-		}
-		s.Clients = newClients
-		s.ClientChan <- nil
-	}()
-	<-s.ClientChan
-
-	log.Println("client disconnected:", stream)
-}
-
-func (s *CounterServer) notifyClients(stream service.Counter_IncrementCounterServer, val *service.CounterValue) error {
-
-	go func() {
-		var streamErr error
-		for _, c := range s.Clients {
-			err := c.Send(val)
-			if err != nil && c == stream {
-				streamErr = err
-			}
-		}
-		s.ClientChan <- streamErr
-	}()
-
-	return <-s.ClientChan
+	clients clientList
+	counter counter
+	port    int
 }
 
 func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounterServer) error {
 
-	s.addClient(stream)
-	defer s.removeClient(stream)
+	s.clients.addClient(stream)
+	defer s.clients.removeClient(stream)
 
 	for {
-
 		in, err := stream.Recv()
 		if err == io.EOF {
 			return nil
@@ -75,34 +30,33 @@ func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounter
 			return err
 		}
 
-		count := s.Counter.Increment(in.Count)
+		count := s.counter.increment(in.Count)
 		log.Println("current count:", count)
+		val := service.CounterValue{count}
 
-		val := &service.CounterValue{count}
-		if err := s.notifyClients(stream, val); err != nil {
+		if err := s.clients.notifyAllClients(stream, val); err != nil {
+			log.Println("notify error:", err)
 			return err
 		}
 	}
 }
 
+func New(port int) CounterServer {
+	return CounterServer{
+		clients: newClientList(),
+		counter: 0,
+		port:    port,
+	}
+}
+
 func (s *CounterServer) Start() {
-	port := fmt.Sprintf(":%v", s.Port)
+	port := fmt.Sprintf(":%v", s.port)
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer()
 	service.RegisterCounterServer(grpcServer, s)
-	log.Println("listening on port:", s.Port)
+	log.Println("listening on port:", s.port)
 	grpcServer.Serve(lis)
-}
-
-func New(port int) *CounterServer {
-	clientChan := make(chan error)
-	clients := []service.Counter_IncrementCounterServer{}
-	return &CounterServer{
-		ClientChan: clientChan,
-		Clients:    clients,
-		Counter:    0,
-		Port:       port}
 }

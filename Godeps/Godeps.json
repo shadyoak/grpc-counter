@@ -8,6 +8,16 @@
 			"Rev": "3852dcfda249c2097355a6aabb199a28d97b30df"
 		},
 		{
+			"ImportPath": "github.com/gorilla/websocket",
+			"Comment": "v1.0.0-15-g54f9dec",
+			"Rev": "54f9decdbfb3fe254c5df3d5aa234480989f4af0"
+		},
+		{
+			"ImportPath": "github.com/simon-whitehead/relayR",
+			"Comment": "v0.2.1-12-g3e5ef07",
+			"Rev": "3e5ef072cb350bd883ee7a74d76ec1b5c84e64f5"
+		},
+		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "8e573f4005aa312856df2ea97c32b9beac70dd89"
 		},

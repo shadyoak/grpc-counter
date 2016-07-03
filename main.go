@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/shadyoak/grpc-counter/server"
 	"github.com/shadyoak/grpc-counter/web"
 )
@@ -26,8 +24,7 @@ func main() {
 
 	// start the web server
 	go func() {
-		address := fmt.Sprintf("%v:%v", rpcHost, rpcPort)
-		web := web.New(webPort, address)
+		web := web.New(rpcHost, rpcPort, webPort)
 		web.Start()
 		close(wait)
 	}()

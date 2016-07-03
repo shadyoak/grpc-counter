@@ -13,27 +13,29 @@ type CountRelay struct {
 }
 
 type WebServer struct {
-	counterServerAddress string
-	exchange             *relayr.Exchange
-	port                 int
+	exchange *relayr.Exchange
+	rpcHost  string
+	rpcPort  int
+	webPort  int
 }
 
 func (tr CountRelay) PushCount(relay *relayr.Relay, count int) {
 	relay.Clients.All("counterUpdated", count)
 }
 
-func New(webServerPort int, counterServerAddress string) *WebServer {
+func New(rpcHost string, rpcPort, webServerPort int) *WebServer {
 	exchange := relayr.NewExchange()
 	exchange.RegisterRelay(CountRelay{})
 	return &WebServer{
-		counterServerAddress: counterServerAddress,
-		exchange:             exchange,
-		port:                 webServerPort,
+		exchange: exchange,
+		rpcHost:  rpcHost,
+		rpcPort:  rpcPort,
+		webPort:  webServerPort,
 	}
 }
 
 func (w *WebServer) Start() {
-	log.Println("web server listening on port:", w.port)
+	log.Println("web server listening on port:", w.webPort)
 
 	counter := 0
 
@@ -55,7 +57,7 @@ func (w *WebServer) Start() {
 	//http.Handle("/", http.FileServer(http.Dir("./web/static")))
 	http.Handle("/", http.FileServer(assets))
 
-	addr := fmt.Sprintf(":%v", w.port)
+	addr := fmt.Sprintf(":%v", w.webPort)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("unable to start web server: %v", err)
 	}

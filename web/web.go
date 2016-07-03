@@ -41,26 +41,14 @@ func (w *WebServer) Start() {
 	}()
 
 	http.Handle("/relayr/", exchange)
-	http.Handle("/", http.FileServer(http.Dir("./web")))
+
+	assets := assetFS()
+	assets.Prefix += "/static/"
+
+	// DEBUG: uncomment to serve from the file system directly
+	//http.Handle("/", http.FileServer(http.Dir("./web/static")))
+	http.Handle("/", http.FileServer(assets))
 
 	addr := fmt.Sprintf(":%v", w.port)
 	http.ListenAndServe(addr, nil)
-}
-
-func main() {
-	exchange := relayr.NewExchange()
-	exchange.RegisterRelay(TimeRelay{})
-
-	go func() {
-		for {
-			select {
-			case <-time.After(time.Second * 1):
-				exchange.Relay(TimeRelay{}).Call("PushTime")
-			}
-		}
-	}()
-
-	http.Handle("/relayr/", exchange)
-	http.Handle("/", http.FileServer(http.Dir(".")))
-	http.ListenAndServe(":80", nil)
 }

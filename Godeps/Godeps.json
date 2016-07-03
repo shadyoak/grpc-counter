@@ -4,6 +4,10 @@
 	"GodepVersion": "v74",
 	"Deps": [
 		{
+			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
+			"Rev": "57eb5e1fc594ad4b0b1dbea7b286d299e0cb43c2"
+		},
+		{
 			"ImportPath": "github.com/golang/protobuf/proto",
 			"Rev": "3852dcfda249c2097355a6aabb199a28d97b30df"
 		},

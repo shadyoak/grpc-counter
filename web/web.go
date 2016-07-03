@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ func New(webServerPort int, counterServerAddress string) *WebServer {
 }
 
 func (w *WebServer) Start() {
+	log.Println("web server listening on port:", w.port)
 	exchange := relayr.NewExchange()
 	exchange.RegisterRelay(TimeRelay{})
 
@@ -50,5 +52,8 @@ func (w *WebServer) Start() {
 	http.Handle("/", http.FileServer(assets))
 
 	addr := fmt.Sprintf(":%v", w.port)
-	http.ListenAndServe(addr, nil)
+	log.Println("web server listening at address:", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		log.Fatalf("unable to start web server: %v", err)
+	}
 }

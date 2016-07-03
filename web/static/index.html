@@ -6,13 +6,13 @@
 	<script src="/relayr"></script>
 	<script type="text/javascript">
 		RelayRConnection.ready(function() {
-			RelayR.TimeRelay.client.timeUpdated = function(time) {
-				document.getElementById('time').innerHTML = time;
+			RelayR.CountRelay.client.counterUpdated = function(count) {
+				document.getElementById('counter').innerHTML = count;
 			};
 		});
 	</script>
 </head>
 <body>
-	<div id="time"></div>
+	<div id="counter"></div>
 </body>
 </html>

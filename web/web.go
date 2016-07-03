@@ -9,41 +9,45 @@ import (
 	"github.com/simon-whitehead/relayR"
 )
 
-type TimeRelay struct {
+type CountRelay struct {
 }
 
 type WebServer struct {
 	counterServerAddress string
+	exchange             *relayr.Exchange
 	port                 int
 }
 
-func (tr TimeRelay) PushTime(relay *relayr.Relay) {
-	relay.Clients.All("timeUpdated", time.Now().Local().Format("Mon Jan 2 2006 03:04:05 PM"))
+func (tr CountRelay) PushCount(relay *relayr.Relay, count int) {
+	relay.Clients.All("counterUpdated", count)
 }
 
 func New(webServerPort int, counterServerAddress string) *WebServer {
+	exchange := relayr.NewExchange()
+	exchange.RegisterRelay(CountRelay{})
 	return &WebServer{
 		counterServerAddress: counterServerAddress,
+		exchange:             exchange,
 		port:                 webServerPort,
 	}
 }
 
 func (w *WebServer) Start() {
 	log.Println("web server listening on port:", w.port)
-	exchange := relayr.NewExchange()
-	exchange.RegisterRelay(TimeRelay{})
+
+	counter := 0
 
 	go func() {
 		for {
 			select {
 			case <-time.After(time.Second * 1):
-				exchange.Relay(TimeRelay{}).Call("PushTime")
+				counter += 1
+				w.exchange.Relay(CountRelay{}).Call("PushCount", counter)
 			}
 		}
 	}()
 
-	http.Handle("/relayr/", exchange)
-
+	http.Handle("/relayr/", w.exchange)
 	assets := assetFS()
 	assets.Prefix += "/static/"
 
@@ -52,7 +56,6 @@ func (w *WebServer) Start() {
 	http.Handle("/", http.FileServer(assets))
 
 	addr := fmt.Sprintf(":%v", w.port)
-	log.Println("web server listening at address:", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("unable to start web server: %v", err)
 	}

@@ -10,6 +10,5 @@ set -eu
 # ------------------
 # https://github.com/elazarl/go-bindata-assetfs
 
-#go-bindata-assetfs -pkg 'web' -o 'web/assets.go' 'web/static/...'
 go-bindata-assetfs -pkg "web" "web/static/..."
 mv -f 'bindata_assetfs.go' 'web/assets.go'

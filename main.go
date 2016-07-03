@@ -10,14 +10,14 @@ import (
 const (
 	rpcHost = "localhost"
 	rpcPort = 5000
-	webPort = 80
+	webPort = 8080
 )
 
 func main() {
 
 	wait := make(chan bool)
 
-	// start the RPC server
+	// start the counter RPC server
 	go func() {
 		server := server.New(rpcPort)
 		server.Start()

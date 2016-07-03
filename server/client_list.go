@@ -31,7 +31,7 @@ func newClientList() clientList {
 
 func (c *clientList) notifyAllClients(client counterClient, val service.CounterValue) error {
 	c.mutex.RLock()
-	// TODO: Needs a better error handling and timeouts...
+	// TODO: Needs a better error handling, concurrency, and timeouts...
 	var result error
 	for _, c := range c.clients {
 		err := c.Send(&val)

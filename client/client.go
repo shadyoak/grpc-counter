@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"io"
-	"log"
 	"time"
 
 	"github.com/shadyoak/grpc-counter/service"
@@ -12,54 +12,81 @@ import (
 )
 
 const (
-	address = "localhost:5000"
+	defaultHostname = "localhost"
+	defaultPort     = 5000
 )
 
-func main() {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("unable to connect: %v", err)
-	}
-	defer conn.Close()
-	client := service.NewCounterClient(conn)
-	testCounter(client)
+type CounterClient struct {
+	hostname string
+	port     int
 }
 
-func testCounter(client service.CounterClient) {
-
-	stream, err := client.IncrementCounter(context.Background())
-	if err != nil {
-		grpclog.Fatalf("unable to create stream: %v", err)
-	}
-	defer func() {
-		grpclog.Println("closing stream...")
-		stream.CloseSend()
+func countToTen(stream service.Counter_IncrementCounterClient) <-chan bool {
+	c := make(chan bool)
+	go func() {
+		for i := 0; i < 10; i++ {
+			c := &service.CounterValue{int32(1)}
+			if err := stream.Send(c); err != nil {
+				grpclog.Fatalf("failed to send a count: %v", err)
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
 	}()
+	return c
+}
 
-	waitc := make(chan struct{})
-
-	go func(c chan struct{}) {
+func listenForUpdates(stream service.Counter_IncrementCounterClient) <-chan bool {
+	c := make(chan bool)
+	go func() {
 		for {
 			in, err := stream.Recv()
 			if err == io.EOF {
 				close(c)
 				return
-			}
-			if err != nil {
+			} else if err != nil {
 				grpclog.Fatalf("failed to receive count: %v", err)
 			}
 			grpclog.Printf("got count: %v", in.Count)
 		}
-	}(waitc)
+	}()
+	return c
+}
 
-	for i := 0; i < 10; i++ {
-		c := &service.CounterValue{int32(1)}
-		if err := stream.Send(c); err != nil {
-			grpclog.Fatalf("failed to send a count: %v", err)
-		}
+func runTest(client service.CounterClient) {
 
-		time.Sleep(500 * time.Millisecond)
+	stream, err := client.IncrementCounter(context.Background())
+	if err != nil {
+		grpclog.Fatalf("unable to create stream: %v", err)
 	}
+	defer stream.CloseSend()
 
-	<-waitc
+	listen := listenForUpdates(stream)
+	count := countToTen(stream)
+
+	<-count
+	<-listen
+}
+
+func New(hostname string, port int) *CounterClient {
+	return &CounterClient{
+		hostname: hostname,
+		port:     port,
+	}
+}
+
+func (c *CounterClient) Start() {
+	address := fmt.Sprintf("%v:%v", c.hostname, c.port)
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		grpclog.Fatalf("unable to connect: %v", err)
+	}
+	grpclog.Println("connected to:", address)
+	defer conn.Close()
+	client := service.NewCounterClient(conn)
+	runTest(client)
+}
+
+func main() {
+	client := New(defaultHostname, defaultPort)
+	client.Start()
 }

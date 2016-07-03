@@ -17,7 +17,6 @@ type CounterServer struct {
 }
 
 func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounterServer) error {
-
 	s.clients.addClient(stream)
 	defer s.clients.removeClient(stream)
 
@@ -41,8 +40,8 @@ func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounter
 	}
 }
 
-func New(port int) CounterServer {
-	return CounterServer{
+func New(port int) *CounterServer {
+	return &CounterServer{
 		clients: newClientList(),
 		counter: 0,
 		port:    port,

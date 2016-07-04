@@ -17,6 +17,7 @@ const (
 )
 
 type CounterClient struct {
+	cleanup  func()
 	hostname string
 	port     int
 	Receive  ReceiveChannels
@@ -61,18 +62,17 @@ func (c *CounterClient) listenForUpdates(stream service.Counter_IncrementCounter
 	return ch
 }
 
-func (c *CounterClient) runTest(client service.CounterClient) {
+func (c *CounterClient) beginStreaming(client service.CounterClient) service.Counter_IncrementCounterClient {
 
 	stream, err := client.IncrementCounter(context.Background())
 	if err != nil {
 		grpclog.Fatalf("unable to create stream: %v", err)
 	}
 
-	// TODO: need to cleanup this stream somehow
-	//defer stream.CloseSend()
-
 	c.listenForUpdates(stream)
 	c.countToTen(stream)
+
+	return stream
 }
 
 func New(hostname string, port int) *CounterClient {
@@ -96,16 +96,24 @@ func (c *CounterClient) Start() {
 	}
 	grpclog.Println("connected to:", address)
 
-	// TODO: need to cleanup this connection somehow
-	//defer conn.Close()
-
 	client := service.NewCounterClient(conn)
-	c.runTest(client)
+	stream := c.beginStreaming(client)
+
+	c.cleanup = func() {
+		stream.CloseSend()
+		conn.Close()
+	}
+}
+
+func (c *CounterClient) Stop() {
+	c.cleanup()
 }
 
 func main() {
 	client := New(defaultHostname, defaultPort)
 	client.Start()
+	defer client.Stop()
+
 Loop:
 	for {
 		select {

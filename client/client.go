@@ -1,14 +1,13 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/shadyoak/grpc-counter/service"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 )
 
 type CounterClient struct {
@@ -16,6 +15,7 @@ type CounterClient struct {
 	hostname string
 	port     int
 	Receive  ReceiveChannels
+	stream   service.Counter_IncrementCounterClient
 }
 
 type ReceiveChannels struct {
@@ -24,31 +24,16 @@ type ReceiveChannels struct {
 	Done          chan bool
 }
 
-func (c *CounterClient) countToTen(stream service.Counter_IncrementCounterClient) <-chan bool {
-	ch := make(chan bool)
-	go func() {
-		for i := 0; i < 10; i++ {
-			counter := &service.CounterValue{int32(1)}
-			if err := stream.Send(counter); err != nil {
-				// TODO: make non-fatal
-				grpclog.Fatalf("failed to send a count: %v", err)
-			}
-			time.Sleep(500 * time.Millisecond)
-		}
-	}()
-	return ch
-}
+var ClientNotStartedError = errors.New("client not started")
 
 func createCleanupFunc(stream service.Counter_IncrementCounterClient, conn *grpc.ClientConn) func() error {
 	return func() error {
-		err1 := stream.CloseSend()
-		err2 := conn.Close()
-		if err1 != nil {
-			return err1
-		} else if err2 != nil {
-			return err2
+		streamErr := stream.CloseSend()
+		connErr := conn.Close()
+		if streamErr != nil {
+			return streamErr
 		}
-		return nil
+		return connErr
 	}
 }
 
@@ -77,8 +62,19 @@ func (c *CounterClient) openIncrementCounterStream(client service.CounterClient)
 		return nil, err
 	}
 	c.listenForStreamUpdates(stream)
-	c.countToTen(stream)
 	return stream, nil
+}
+
+func (c *CounterClient) Address() string {
+	return fmt.Sprintf("%v:%v", c.hostname, c.port)
+}
+
+func (c *CounterClient) IncrementCounter(val int) error {
+	if c.stream == nil {
+		return ClientNotStartedError
+	}
+	counter := &service.CounterValue{int32(1)}
+	return c.stream.Send(counter)
 }
 
 func New(hostname string, port int) *CounterClient {
@@ -96,8 +92,7 @@ func New(hostname string, port int) *CounterClient {
 
 func (c *CounterClient) Start() error {
 
-	address := fmt.Sprintf("%v:%v", c.hostname, c.port)
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(c.Address(), grpc.WithInsecure())
 	if err != nil {
 		return err
 	}
@@ -110,6 +105,7 @@ func (c *CounterClient) Start() error {
 	}
 
 	c.cleanup = createCleanupFunc(stream, conn)
+	c.stream = stream
 	return nil
 }
 
@@ -117,6 +113,7 @@ func (c *CounterClient) Stop() error {
 	var err error
 	if c.cleanup != nil {
 		err = c.cleanup()
+		c.stream = nil
 		c.cleanup = nil
 	}
 	return err

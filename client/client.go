@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"fmt"
@@ -11,13 +11,8 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-const (
-	defaultHostname = "localhost"
-	defaultPort     = 5000
-)
-
 type CounterClient struct {
-	cleanup  func()
+	cleanup  func() error
 	hostname string
 	port     int
 	Receive  ReceiveChannels
@@ -35,6 +30,7 @@ func (c *CounterClient) countToTen(stream service.Counter_IncrementCounterClient
 		for i := 0; i < 10; i++ {
 			counter := &service.CounterValue{int32(1)}
 			if err := stream.Send(counter); err != nil {
+				// TODO: make non-fatal
 				grpclog.Fatalf("failed to send a count: %v", err)
 			}
 			time.Sleep(500 * time.Millisecond)
@@ -43,7 +39,20 @@ func (c *CounterClient) countToTen(stream service.Counter_IncrementCounterClient
 	return ch
 }
 
-func (c *CounterClient) listenForUpdates(stream service.Counter_IncrementCounterClient) <-chan bool {
+func createCleanupFunc(stream service.Counter_IncrementCounterClient, conn *grpc.ClientConn) func() error {
+	return func() error {
+		err1 := stream.CloseSend()
+		err2 := conn.Close()
+		if err1 != nil {
+			return err1
+		} else if err2 != nil {
+			return err2
+		}
+		return nil
+	}
+}
+
+func (c *CounterClient) listenForStreamUpdates(stream service.Counter_IncrementCounterClient) <-chan bool {
 	ch := make(chan bool)
 	go func() {
 		for {
@@ -62,17 +71,14 @@ func (c *CounterClient) listenForUpdates(stream service.Counter_IncrementCounter
 	return ch
 }
 
-func (c *CounterClient) beginStreaming(client service.CounterClient) service.Counter_IncrementCounterClient {
-
+func (c *CounterClient) openIncrementCounterStream(client service.CounterClient) (service.Counter_IncrementCounterClient, error) {
 	stream, err := client.IncrementCounter(context.Background())
 	if err != nil {
-		grpclog.Fatalf("unable to create stream: %v", err)
+		return nil, err
 	}
-
-	c.listenForUpdates(stream)
+	c.listenForStreamUpdates(stream)
 	c.countToTen(stream)
-
-	return stream
+	return stream, nil
 }
 
 func New(hostname string, port int) *CounterClient {
@@ -88,42 +94,30 @@ func New(hostname string, port int) *CounterClient {
 	}
 }
 
-func (c *CounterClient) Start() {
+func (c *CounterClient) Start() error {
+
 	address := fmt.Sprintf("%v:%v", c.hostname, c.port)
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		grpclog.Fatalf("unable to connect: %v", err)
+		return err
 	}
-	grpclog.Println("connected to:", address)
 
 	client := service.NewCounterClient(conn)
-	stream := c.beginStreaming(client)
-
-	c.cleanup = func() {
-		stream.CloseSend()
+	stream, err := c.openIncrementCounterStream(client)
+	if err != nil {
 		conn.Close()
+		return err
 	}
+
+	c.cleanup = createCleanupFunc(stream, conn)
+	return nil
 }
 
-func (c *CounterClient) Stop() {
-	c.cleanup()
-}
-
-func main() {
-	client := New(defaultHostname, defaultPort)
-	client.Start()
-	defer client.Stop()
-
-Loop:
-	for {
-		select {
-		case count := <-client.Receive.CounterUpdate:
-			grpclog.Printf("got count: %v", count)
-		case err := <-client.Receive.Error:
-			grpclog.Fatalf("fatal error: %v", err)
-		case <-client.Receive.Done:
-			grpclog.Printf("updates complete")
-			break Loop
-		}
+func (c *CounterClient) Stop() error {
+	var err error
+	if c.cleanup != nil {
+		err = c.cleanup()
+		c.cleanup = nil
 	}
+	return err
 }

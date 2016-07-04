@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
+	"github.com/shadyoak/grpc-counter/client"
 	"github.com/simon-whitehead/relayR"
 )
 
@@ -17,6 +17,26 @@ type WebServer struct {
 	rpcHost  string
 	rpcPort  int
 	webPort  int
+}
+
+func (w *WebServer) listenForUpdates(client *client.CounterClient) chan bool {
+	c := make(chan bool)
+	go func() {
+	Loop:
+		for {
+			select {
+			case count := <-client.Receive.CounterUpdate:
+				w.exchange.Relay(CountRelay{}).Call("PushCount", count)
+			case err := <-client.Receive.Error:
+				log.Printf("rpc error: %v", err)
+			case <-client.Receive.Done:
+				log.Printf("updates complete")
+				close(c)
+				break Loop
+			}
+		}
+	}()
+	return c
 }
 
 func (tr CountRelay) PushCount(relay *relayr.Relay, count int) {
@@ -35,20 +55,17 @@ func New(rpcHost string, rpcPort, webServerPort int) *WebServer {
 }
 
 func (w *WebServer) Start() {
-	log.Println("web server listening on port:", w.webPort)
 
-	counter := 0
+	// connect and listen to the RPC server
+	client := client.New(w.rpcHost, w.rpcPort)
+	if err := client.Start(); err != nil {
+		log.Fatalf("unable to connect to rpc server: %v", err)
+	}
+	defer client.Stop()
+	log.Println("web server connected to rpc server:", client.Address())
+	w.listenForUpdates(client)
 
-	go func() {
-		for {
-			select {
-			case <-time.After(time.Second * 1):
-				counter += 1
-				w.exchange.Relay(CountRelay{}).Call("PushCount", counter)
-			}
-		}
-	}()
-
+	// serve the website
 	http.Handle("/relayr/", w.exchange)
 	assets := assetFS()
 	assets.Prefix += "/static/"
@@ -58,6 +75,7 @@ func (w *WebServer) Start() {
 	http.Handle("/", http.FileServer(assets))
 
 	addr := fmt.Sprintf(":%v", w.webPort)
+	log.Println("web server listening on port:", w.webPort)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("unable to start web server: %v", err)
 	}

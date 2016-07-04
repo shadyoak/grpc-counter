@@ -57,5 +57,7 @@ func (s *CounterServer) Start() {
 	grpcServer := grpc.NewServer()
 	service.RegisterCounterServer(grpcServer, s)
 	log.Println("counter server listening on port:", s.port)
-	grpcServer.Serve(lis)
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("unable to start counter server: %v", err)
+	}
 }

@@ -34,8 +34,7 @@ func listenForUpdates(client *client.CounterClient) chan bool {
 
 func main() {
 	client := client.New(host, port)
-	err := client.Start()
-	if err != nil {
+	if err := client.Start(); err != nil {
 		grpclog.Fatalf("unable to connect to client: %v", err)
 	}
 	defer client.Stop()

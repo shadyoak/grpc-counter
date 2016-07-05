@@ -21,22 +21,36 @@ type WebServer struct {
 
 func (w *WebServer) listenForUpdates(client *client.CounterClient) chan bool {
 	c := make(chan bool)
+
+	printChan := make(chan int)
+	go w.printCounts(printChan)
+
 	go func() {
 	Loop:
 		for {
 			select {
 			case count := <-client.Receive.CounterUpdate:
-				w.exchange.Relay(CountRelay{}).Call("PushCount", count)
+				//w.exchange.Relay(CountRelay{}).Call("PushCount", count)
+				printChan <- count
 			case err := <-client.Receive.Error:
-				log.Printf("rpc error: %v", err)
+				close(printChan)
+				log.Fatalf("rpc error: %v", err)
 			case <-client.Receive.Done:
 				log.Printf("updates complete")
+				close(printChan)
 				close(c)
 				break Loop
 			}
 		}
 	}()
 	return c
+}
+
+func (w *WebServer) printCounts(c chan int) {
+	for {
+		count := <-c
+		w.exchange.Relay(CountRelay{}).Call("PushCount", count)
+	}
 }
 
 func (tr CountRelay) PushCount(relay *relayr.Relay, count int) {

@@ -14,22 +14,35 @@ const (
 
 func listenForUpdates(client *client.CounterClient) chan bool {
 	c := make(chan bool)
+
+	printChan := make(chan int)
+	go printCounts(printChan)
+
 	go func() {
 	Loop:
 		for {
 			select {
 			case count := <-client.Receive.CounterUpdate:
-				grpclog.Printf("got count: %v", count)
+				printChan <- count
 			case err := <-client.Receive.Error:
+				close(printChan)
 				grpclog.Fatalf("fatal error: %v", err)
 			case <-client.Receive.Done:
 				grpclog.Printf("updates complete")
+				close(printChan)
 				close(c)
 				break Loop
 			}
 		}
 	}()
 	return c
+}
+
+func printCounts(c chan int) {
+	for {
+		count := <-c
+		grpclog.Printf("got count: %v", count)
+	}
 }
 
 func main() {

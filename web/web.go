@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/shadyoak/grpc-counter/client"
 	"github.com/simon-whitehead/relayR"
@@ -47,9 +48,19 @@ func (w *WebServer) listenForUpdates(client *client.CounterClient) chan bool {
 }
 
 func (w *WebServer) printCounts(c chan int) {
+	flush := time.Tick(500 * time.Millisecond)
+
+	var count *int
 	for {
-		count := <-c
-		w.exchange.Relay(CountRelay{}).Call("PushCount", count)
+		select {
+		case counter := <-c:
+			count = &counter
+		case <-flush:
+			if count != nil {
+				w.exchange.Relay(CountRelay{}).Call("PushCount", *count)
+				count = nil
+			}
+		}
 	}
 }
 

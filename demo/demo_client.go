@@ -39,9 +39,20 @@ func listenForUpdates(client *client.CounterClient) chan bool {
 }
 
 func printCounts(c chan int) {
+
+	flush := time.Tick(25 * time.Millisecond)
+
+	var count *int
 	for {
-		count := <-c
-		grpclog.Printf("got count: %v", count)
+		select {
+		case counter := <-c:
+			count = &counter
+		case <-flush:
+			if count != nil {
+				grpclog.Printf("got count: %v", *count)
+				count = nil
+			}
+		}
 	}
 }
 

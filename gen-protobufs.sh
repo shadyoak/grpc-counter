@@ -14,4 +14,4 @@ set -eu
 # -------------------
 # https://github.com/golang/protobuf
 
-protoc --go_out=plugins=grpc:. "service/*.proto"
+protoc --go_out=plugins=grpc:. service/*.proto

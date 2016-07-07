@@ -17,6 +17,11 @@ type clientList struct {
 	mutex   sync.RWMutex
 }
 
+type sendError struct {
+	client *counterClient
+	err    error
+}
+
 func (c *clientList) addClient(client counterClient) {
 	c.mutex.Lock()
 	c.clients = append(c.clients, client)
@@ -33,8 +38,8 @@ func newClientList() clientList {
 func (c *clientList) notifyAllClients(client counterClient, count int) error {
 
 	clients := make(chan counterClient)
-	errChan := make(chan error)
-	errorList := make([]error, 0)
+	errChan := make(chan sendError)
+	errorList := make([]sendError, 0)
 
 	wg := sync.WaitGroup{}
 	wg.Add(4)
@@ -54,14 +59,16 @@ func (c *clientList) notifyAllClients(client counterClient, count int) error {
 	wg.Wait()
 	close(errChan)
 
-	if len(errorList) > 0 {
-		return errorList[0]
+	for _, err := range errorList {
+		if err.err == NotificationTimeoutError || *err.client == client {
+			return err.err
+		}
 	}
 
 	return nil
 }
 
-func processErrors(errChan chan error, acc *[]error) {
+func processErrors(errChan chan sendError, acc *[]sendError) {
 Loop:
 	for {
 		select {
@@ -88,7 +95,7 @@ func (c *clientList) removeClient(client counterClient) {
 	log.Println("client disconnected:", client)
 }
 
-func sendCount(count int, clients chan counterClient, errChan chan error, wg *sync.WaitGroup) {
+func sendCount(count int, clients chan counterClient, errChan chan sendError, wg *sync.WaitGroup) {
 Loop:
 	for {
 
@@ -99,14 +106,14 @@ Loop:
 			if ok {
 				val := service.CounterValue{int32(count)}
 				if err := c.Send(&val); err != nil {
-					errChan <- err
+					errChan <- sendError{client: &c, err: err}
 				}
 			} else {
 				wg.Done()
 				break Loop
 			}
 		case <-timeout:
-			errChan <- NotificationTimeoutError
+			errChan <- sendError{err: NotificationTimeoutError}
 		}
 	}
 }

@@ -37,23 +37,19 @@ func createCleanupFunc(stream service.Counter_IncrementCounterClient, conn *grpc
 	}
 }
 
-func (c *CounterClient) listenForStreamUpdates(stream service.Counter_IncrementCounterClient) <-chan bool {
-	ch := make(chan bool)
-	go func() {
-		for {
-			in, err := stream.Recv()
-			if err == io.EOF {
-				c.Receive.Done <- true
-				return
-			} else if err != nil {
-				c.Receive.Error <- err
-			} else {
-				count := int(in.Count)
-				c.Receive.CounterUpdate <- count
-			}
+func (c *CounterClient) listenForStreamUpdates(stream service.Counter_IncrementCounterClient) {
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			c.Receive.Done <- true
+			return
+		} else if err != nil {
+			c.Receive.Error <- err
+		} else {
+			count := int(in.Count)
+			c.Receive.CounterUpdate <- count
 		}
-	}()
-	return ch
+	}
 }
 
 func (c *CounterClient) openIncrementCounterStream(client service.CounterClient) (service.Counter_IncrementCounterClient, error) {
@@ -61,7 +57,7 @@ func (c *CounterClient) openIncrementCounterStream(client service.CounterClient)
 	if err != nil {
 		return nil, err
 	}
-	c.listenForStreamUpdates(stream)
+	go c.listenForStreamUpdates(stream)
 	return stream, nil
 }
 

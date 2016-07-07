@@ -30,7 +30,7 @@ func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounter
 		}
 
 		count := s.counter.increment(in.Count)
-		log.Println("current count:", count)
+		//log.Println("current count:", count)
 		val := service.CounterValue{count}
 
 		if err := s.clients.notifyAllClients(stream, val); err != nil {

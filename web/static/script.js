@@ -69,7 +69,7 @@ Countdown.prototype = {
 };
 
 new Countdown(
-  12,
+  9,
   document.querySelector('.count'),
   document.querySelector('#count-template')
 );

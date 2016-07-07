@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	host = "localhost"
-	port = 5000
+	host    = "localhost"
+	port    = 5000
+	countTo = 10
+	delay   = 500 /* milliseconds */
 )
 
 func listenForUpdates(client *client.CounterClient) chan bool {
@@ -66,11 +68,11 @@ func main() {
 
 	listen := listenForUpdates(client)
 
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < countTo; i++ {
 		if err := client.IncrementCounter(1); err != nil {
 			grpclog.Fatalf("increment counter error: %v", err)
 		}
-		//time.Sleep(500 * time.Millisecond)
+		time.Sleep(delay * time.Millisecond)
 	}
 
 	<-listen

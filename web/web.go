@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/shadyoak/grpc-counter/client"
-	"github.com/simon-whitehead/relayR"
+	"github.com/simon-whitehead/relayr"
 )
 
 type CountRelay struct {
@@ -31,7 +31,6 @@ func (w *WebServer) listenForUpdates(client *client.CounterClient) chan bool {
 		for {
 			select {
 			case count := <-client.Receive.CounterUpdate:
-				//w.exchange.Relay(CountRelay{}).Call("PushCount", count)
 				printChan <- count
 			case err := <-client.Receive.Error:
 				close(printChan)

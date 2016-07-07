@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"sync"
+	"time"
 
 	"github.com/shadyoak/grpc-counter/service"
 )
@@ -32,16 +33,16 @@ func newClientList() clientList {
 func (c *clientList) notifyAllClients(client counterClient, count int) error {
 
 	clients := make(chan counterClient)
-	errors := make(chan error)
+	errChan := make(chan error)
 	errorList := make([]error, 0)
 
 	wg := sync.WaitGroup{}
 	wg.Add(4)
-	go sendCount(count, clients, errors, &wg)
-	go sendCount(count, clients, errors, &wg)
-	go sendCount(count, clients, errors, &wg)
-	go sendCount(count, clients, errors, &wg)
-	go processErrors(errors, &errorList)
+	go sendCount(count, clients, errChan, &wg)
+	go sendCount(count, clients, errChan, &wg)
+	go sendCount(count, clients, errChan, &wg)
+	go sendCount(count, clients, errChan, &wg)
+	go processErrors(errChan, &errorList)
 
 	c.mutex.RLock()
 	for _, c := range c.clients {
@@ -51,7 +52,7 @@ func (c *clientList) notifyAllClients(client counterClient, count int) error {
 	c.mutex.RUnlock()
 
 	wg.Wait()
-	close(errors)
+	close(errChan)
 
 	if len(errorList) > 0 {
 		return errorList[0]
@@ -60,11 +61,11 @@ func (c *clientList) notifyAllClients(client counterClient, count int) error {
 	return nil
 }
 
-func processErrors(errors chan error, acc *[]error) {
+func processErrors(errChan chan error, acc *[]error) {
 Loop:
 	for {
 		select {
-		case err, ok := <-errors:
+		case err, ok := <-errChan:
 			if ok {
 				*acc = append(*acc, err)
 			} else {
@@ -87,21 +88,25 @@ func (c *clientList) removeClient(client counterClient) {
 	log.Println("client disconnected:", client)
 }
 
-func sendCount(count int, clients chan counterClient, errors chan error, wg *sync.WaitGroup) {
+func sendCount(count int, clients chan counterClient, errChan chan error, wg *sync.WaitGroup) {
 Loop:
 	for {
+
+		timeout := time.After(25 * time.Millisecond)
+
 		select {
-		// TODO: Needs timeouts...
 		case c, ok := <-clients:
 			if ok {
 				val := service.CounterValue{int32(count)}
 				if err := c.Send(&val); err != nil {
-					errors <- err
+					errChan <- err
 				}
 			} else {
 				wg.Done()
 				break Loop
 			}
+		case <-timeout:
+			errChan <- NotificationTimeoutError
 		}
 	}
 }

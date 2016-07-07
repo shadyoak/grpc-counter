@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,8 @@ type CounterServer struct {
 	counter counter
 	port    int
 }
+
+var NotificationTimeoutError = errors.New("timeout while notifying clients")
 
 func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounterServer) error {
 	s.clients.addClient(stream)
@@ -32,8 +35,12 @@ func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounter
 
 		count := s.counter.increment(in.Count)
 		if err := s.clients.notifyAllClients(stream, int(count)); err != nil {
-			log.Println("notify error:", err)
-			return err
+			if err == NotificationTimeoutError {
+				log.Println("unable to notify all clients for count:", count)
+			} else {
+				log.Println("notify error:", err)
+				return err
+			}
 		}
 	}
 }

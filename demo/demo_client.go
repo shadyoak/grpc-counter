@@ -27,7 +27,6 @@ func listenForUpdates(client *client.CounterClient) chan bool {
 			case count := <-client.Receive.CounterUpdate:
 				printChan <- count
 			case err := <-client.Receive.Error:
-				close(printChan)
 				grpclog.Fatalf("fatal error: %v", err)
 			case <-client.Receive.Done:
 				grpclog.Printf("updates complete")

@@ -21,6 +21,7 @@ func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounter
 	defer s.clients.removeClient(stream)
 
 	for {
+
 		in, err := stream.Recv()
 		if err == io.EOF {
 			return nil
@@ -30,10 +31,7 @@ func (s *CounterServer) IncrementCounter(stream service.Counter_IncrementCounter
 		}
 
 		count := s.counter.increment(in.Count)
-		//log.Println("current count:", count)
-		val := service.CounterValue{count}
-
-		if err := s.clients.notifyAllClients(stream, val); err != nil {
+		if err := s.clients.notifyAllClients(stream, int(count)); err != nil {
 			log.Println("notify error:", err)
 			return err
 		}

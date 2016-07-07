@@ -47,7 +47,7 @@ func (w *WebServer) listenForUpdates(client *client.CounterClient) chan bool {
 }
 
 func (w *WebServer) printCounts(c chan int) {
-	flush := time.Tick(1000 * time.Millisecond)
+	flush := time.Tick(1250 * time.Millisecond)
 
 	var count *int
 	for {

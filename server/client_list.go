@@ -29,18 +29,49 @@ func newClientList() clientList {
 	return clientList{c, m}
 }
 
-func (c *clientList) notifyAllClients(client counterClient, val service.CounterValue) error {
+func (c *clientList) notifyAllClients(client counterClient, count int) error {
+
+	clients := make(chan counterClient)
+	errors := make(chan error)
+	errorList := make([]error, 0)
+
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+	go sendCount(count, clients, errors, &wg)
+	go sendCount(count, clients, errors, &wg)
+	go sendCount(count, clients, errors, &wg)
+	go sendCount(count, clients, errors, &wg)
+	go processErrors(errors, &errorList)
+
 	c.mutex.RLock()
-	// TODO: Needs a better error handling, concurrency, and timeouts...
-	var result error
 	for _, c := range c.clients {
-		err := c.Send(&val)
-		if err != nil && c == client {
-			result = err
+		clients <- c
+	}
+	close(clients)
+	c.mutex.RUnlock()
+
+	wg.Wait()
+	close(errors)
+
+	if len(errorList) > 0 {
+		return errorList[0]
+	}
+
+	return nil
+}
+
+func processErrors(errors chan error, acc *[]error) {
+Loop:
+	for {
+		select {
+		case err, ok := <-errors:
+			if ok {
+				*acc = append(*acc, err)
+			} else {
+				break Loop
+			}
 		}
 	}
-	c.mutex.RUnlock()
-	return result
 }
 
 func (c *clientList) removeClient(client counterClient) {
@@ -54,4 +85,23 @@ func (c *clientList) removeClient(client counterClient) {
 	c.clients = newClients
 	c.mutex.Unlock()
 	log.Println("client disconnected:", client)
+}
+
+func sendCount(count int, clients chan counterClient, errors chan error, wg *sync.WaitGroup) {
+Loop:
+	for {
+		select {
+		// TODO: Needs timeouts...
+		case c, ok := <-clients:
+			if ok {
+				val := service.CounterValue{int32(count)}
+				if err := c.Send(&val); err != nil {
+					errors <- err
+				}
+			} else {
+				wg.Done()
+				break Loop
+			}
+		}
+	}
 }

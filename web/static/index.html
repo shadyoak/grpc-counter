@@ -17,13 +17,12 @@
 				clock = new FlipClock($('#counter'), {
 					clockFace: 'Counter',
 					autoStart: false,
-					minimumDigits: 6
+					minimumDigits: 7
 				});
 			});
 
 		RelayRConnection.ready(function() {
 			RelayR.CountRelay.client.counterUpdated = function(count) {
-				//document.getElementById('counter').innerHTML = count;
 				clock.setValue(count);
 			};
 		});

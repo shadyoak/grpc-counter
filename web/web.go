@@ -95,8 +95,8 @@ func (w *WebServer) Start() {
 	assets.Prefix += "/static/"
 
 	// DEBUG: uncomment to serve from the file system directly
-	http.Handle("/", http.FileServer(http.Dir("./web/static")))
-	//http.Handle("/", http.FileServer(assets))
+	//http.Handle("/", http.FileServer(http.Dir("./web/static")))
+	http.Handle("/", http.FileServer(assets))
 
 	addr := fmt.Sprintf(":%v", w.webPort)
 	log.Println("web server listening on port:", w.webPort)

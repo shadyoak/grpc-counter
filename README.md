@@ -2,7 +2,7 @@
 
 A simple counter demonstration using gRPC.
 
-http://www.grpc.io/
+http://www.grpc.io
 
 ## Installation
 
@@ -33,4 +33,4 @@ $ ./demo
 
 ## Extra Credit
 
-Run multiple instances of the demo client simultaneously.
+Run multiple instances of the demo simultaneously. What happens?

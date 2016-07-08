@@ -91,7 +91,7 @@ func sendCount(count int, curr counterClient, clients chan clientMutexPair, errC
 Loop:
 	for {
 
-		timeout := time.After(2000 * time.Millisecond)
+		timeout := time.After(25 * time.Millisecond)
 
 		select {
 		case pair, ok := <-clients:

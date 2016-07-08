@@ -14,7 +14,7 @@ type counterClient interface {
 
 type clientList struct {
 	clients []counterClient
-	mutex   sync.RWMutex
+	mutex   sync.Mutex
 }
 
 func (c *clientList) addClient(client counterClient) {
@@ -26,7 +26,7 @@ func (c *clientList) addClient(client counterClient) {
 
 func newClientList() clientList {
 	c := []counterClient{}
-	m := sync.RWMutex{}
+	m := sync.Mutex{}
 	return clientList{c, m}
 }
 
@@ -44,15 +44,16 @@ func (c *clientList) notifyAllClients(client counterClient, count int) error {
 	go sendCount(count, client, clients, errChan, &wg)
 	go processErrors(errChan, &errorList)
 
-	c.mutex.RLock()
+	c.mutex.Lock()
 	for _, c := range c.clients {
 		clients <- c
 	}
 	close(clients)
-	c.mutex.RUnlock()
 
 	wg.Wait()
 	close(errChan)
+
+	c.mutex.Unlock()
 
 	if len(errorList) > 0 {
 		return errorList[0]
@@ -92,7 +93,7 @@ func sendCount(count int, curr counterClient, clients chan counterClient, errCha
 Loop:
 	for {
 
-		timeout := time.After(25 * time.Millisecond)
+		timeout := time.After(2000 * time.Millisecond)
 
 		select {
 		case c, ok := <-clients:

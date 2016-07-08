@@ -13,26 +13,31 @@ type counterClient interface {
 }
 
 type clientList struct {
-	clients []counterClient
-	mutex   sync.Mutex
+	clients map[counterClient]sync.Mutex
+	mutex   sync.RWMutex
+}
+
+type clientMutexPair struct {
+	client counterClient
+	mutex  sync.Mutex
 }
 
 func (c *clientList) addClient(client counterClient) {
 	c.mutex.Lock()
-	c.clients = append(c.clients, client)
+	c.clients[client] = sync.Mutex{}
 	c.mutex.Unlock()
 	log.Println("client connected:", client)
 }
 
 func newClientList() clientList {
-	c := []counterClient{}
-	m := sync.Mutex{}
+	c := make(map[counterClient]sync.Mutex)
+	m := sync.RWMutex{}
 	return clientList{c, m}
 }
 
 func (c *clientList) notifyAllClients(client counterClient, count int) error {
 
-	clients := make(chan counterClient)
+	clients := make(chan clientMutexPair)
 	errChan := make(chan error)
 	errorList := make([]error, 0)
 
@@ -44,16 +49,15 @@ func (c *clientList) notifyAllClients(client counterClient, count int) error {
 	go sendCount(count, client, clients, errChan, &wg)
 	go processErrors(errChan, &errorList)
 
-	c.mutex.Lock()
-	for _, c := range c.clients {
-		clients <- c
+	c.mutex.RLock()
+	for k, v := range c.clients {
+		clients <- clientMutexPair{client: k, mutex: v}
 	}
 	close(clients)
+	c.mutex.RUnlock()
 
 	wg.Wait()
 	close(errChan)
-
-	c.mutex.Unlock()
 
 	if len(errorList) > 0 {
 		return errorList[0]
@@ -78,30 +82,29 @@ Loop:
 
 func (c *clientList) removeClient(client counterClient) {
 	c.mutex.Lock()
-	newClients := c.clients[:0]
-	for _, c := range c.clients {
-		if c != client {
-			newClients = append(newClients, c)
-		}
-	}
-	c.clients = newClients
+	delete(c.clients, client)
 	c.mutex.Unlock()
 	log.Println("client disconnected:", client)
 }
 
-func sendCount(count int, curr counterClient, clients chan counterClient, errChan chan error, wg *sync.WaitGroup) {
+func sendCount(count int, curr counterClient, clients chan clientMutexPair, errChan chan error, wg *sync.WaitGroup) {
 Loop:
 	for {
 
 		timeout := time.After(2000 * time.Millisecond)
 
 		select {
-		case c, ok := <-clients:
+		case pair, ok := <-clients:
 			if ok {
 				val := service.CounterValue{int32(count)}
+				c := pair.client
+
+				pair.mutex.Lock()
 				if err := c.Send(&val); err != nil && c == curr {
 					errChan <- err
 				}
+				pair.mutex.Unlock()
+
 			} else {
 				wg.Done()
 				break Loop

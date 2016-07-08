@@ -41,7 +41,7 @@ func listenForUpdates(client *client.CounterClient) chan bool {
 
 func printCounts(c chan int) {
 
-	flush := time.Tick(25 * time.Millisecond)
+	flush := time.Tick(100 * time.Millisecond)
 
 	var count *int
 	for {

@@ -13,25 +13,25 @@ type counterClient interface {
 }
 
 type clientList struct {
-	clients map[counterClient]sync.Mutex
-	mutex   sync.RWMutex
+	clients map[counterClient]*sync.Mutex
+	mutex   *sync.RWMutex
 }
 
 type clientMutexPair struct {
 	client counterClient
-	mutex  sync.Mutex
+	mutex  *sync.Mutex
 }
 
 func (c *clientList) addClient(client counterClient) {
 	c.mutex.Lock()
-	c.clients[client] = sync.Mutex{}
+	c.clients[client] = &sync.Mutex{}
 	c.mutex.Unlock()
 	log.Println("client connected:", client)
 }
 
 func newClientList() clientList {
-	c := make(map[counterClient]sync.Mutex)
-	m := sync.RWMutex{}
+	c := make(map[counterClient]*sync.Mutex)
+	m := &sync.RWMutex{}
 	return clientList{c, m}
 }
 
@@ -91,7 +91,7 @@ func sendCount(count int, curr counterClient, clients chan clientMutexPair, errC
 Loop:
 	for {
 
-		timeout := time.After(25 * time.Millisecond)
+		timeout := time.After(2000 * time.Millisecond)
 
 		select {
 		case pair, ok := <-clients:

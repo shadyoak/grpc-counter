@@ -31,14 +31,6 @@ func DisableScriptCache() {
 
 var upgrader = &websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
 
-type longPollServerCall struct {
-	Server       bool          `json:"S"`
-	Relay        string        `json:"R"`
-	Method       string        `json:"M"`
-	Arguments    []interface{} `json:"A"`
-	ConnectionID string        `json:"C"`
-}
-
 // Exchange represents a hub where clients exchange information
 // via Relays. Relays registered with the Exchange expose methods
 // that can be invoked by clients.
@@ -60,10 +52,7 @@ type negotiationResponse struct {
 func NewExchange() *Exchange {
 	e := &Exchange{}
 	e.groups = make(map[string][]*client)
-	e.transports = map[string]Transport{
-		"websocket": newWebSocketTransport(e),
-		"longpoll":  newLongPollTransport(e),
-	}
+	e.transports = map[string]Transport{"websocket": newWebSocketTransport(e)}
 
 	return e
 }
@@ -77,10 +66,6 @@ func (e *Exchange) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.upgradeWebSocket(w, r)
 	case opNegotiate:
 		e.negotiateConnection(w, r)
-	case opLongPoll:
-		e.awaitLongPoll(w, r)
-	case opCallServer:
-		e.callServer(w, r)
 	default:
 		e.writeClientScript(w, route)
 	}
@@ -118,26 +103,6 @@ func (e *Exchange) negotiateConnection(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	encoder.Encode(negotiationResponse{ConnectionID: e.addClient(neg.T)})
-}
-
-func (e *Exchange) awaitLongPoll(w http.ResponseWriter, r *http.Request) {
-	jsonResponse(w)
-	cid := e.extractConnectionIDFromURL(r)
-	longPoll := e.transports["longpoll"].(*longPollTransport)
-	longPoll.wait(w, cid)
-}
-
-func (e *Exchange) callServer(w http.ResponseWriter, r *http.Request) {
-	var msg longPollServerCall
-	decoder := json.NewDecoder(r.Body)
-	decoder.Decode(&msg)
-	cid := e.extractConnectionIDFromURL(r)
-	relay := e.getRelayByName(msg.Relay, cid)
-	go e.callRelayMethod(relay, msg.Method, msg.Arguments...)
-}
-
-func (e *Exchange) extractConnectionIDFromURL(r *http.Request) string {
-	return r.URL.Query()["connectionId"][0]
 }
 
 func (e *Exchange) addClient(t string) string {

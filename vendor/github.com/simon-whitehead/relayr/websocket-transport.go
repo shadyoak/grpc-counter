@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/gorilla/websocket"
 )
@@ -115,4 +116,21 @@ func (c *connection) write() {
 		}
 	}
 	c.ws.Close()
+}
+
+type socketHandler struct {
+	c *webSocketTransport
+	e *Exchange
+}
+
+func (wsh socketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	c := &connection{e: wsh.e, out: make(chan []byte, 256), ws: ws, c: wsh.c, id: r.URL.Query()["connectionId"][0]}
+	c.c.connected <- c
+	defer func() { c.c.disconnected <- c }()
+	go c.write()
+	c.read()
 }

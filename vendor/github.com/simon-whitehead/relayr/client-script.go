@@ -9,13 +9,9 @@ package relayr
 
 const connectionClassScript = `
 
-var RelayRConnection = {};
-
-RelayRConnection = (function() {
-	var readyCalled = false;
-	var web, transport;
+var RelayRConnection = (function() {
 	var route = '%v';
-	transport = {
+	var transport = {
 		websocket: {
 			connect: function(c) {
 				var s = this;
@@ -37,49 +33,16 @@ RelayRConnection = (function() {
 				};
 
 				s.socket.onopen = function(evt) {
-					if (!readyCalled) {
-						RelayRConnection.r();
-						readyCalled = true;
-					}
+					RelayRConnection.r();
 				};
 			},
 			send: function(data) {
 				var s = this;
 				s.socket.send(data);
 			}
-		},
-		longpoll: {
-			connect: function(c) {
-				if (!readyCalled) {
-					RelayRConnection.r();
-					readyCalled = true;
-				}
-				var retry;
-				retry = function() {
-					web.gj(route + '/longpoll?connectionId=' + transport.ConnectionId + '&_=' + new Date().getTime(), function(data) {
-						if (data.responseText) {
-							var reconn = JSON.parse(data.responseText);
-							if (reconn.Z) {
-								web.n();
-							} else {
-								c(data);
-								retry();
-							}
-						} else {
-							web.n();
-						}
-					});
-				};
-
-				retry();
-			},
-			send: function(data) {
-				var s = this;
-				web.p(route + '/call?connectionId=' + transport.ConnectionId + '&_=' + new Date().getTime(), data, null, "json", null); 
-			}
 		}
 	};
-	web = (function() {
+	var web = (function() {
 		return {
 			x: function() {
 				var xd;
@@ -108,24 +71,6 @@ RelayRConnection = (function() {
 
 				xd.send();
 			},
-			gj: function(u, c) {
-				var s = this;
-
-				var xd = s.x();
-
-				xd.open('GET', u, true);
-				xd.setRequestHeader("Content-type", "application/json");
-
-				xd.onreadystatechange = function() {
-					if (xd.readyState === 4) {
-						if (xd.status === 200) {
-							c(xd);
-						} 
-					} 
-				};
-
-				xd.send();
-			},
 			p: function(u, d, c, t, e) {
 				var s = this;
 
@@ -135,33 +80,20 @@ RelayRConnection = (function() {
 				xd.setRequestHeader("Content-type", "application/" + t);
 
 				xd.onreadystatechange = function() {
-					if (xd.readyState === 4) {
-						if (xd.status === 200) {
-							if (c) {
-								c(xd);
-							}
-						}
+					if (xd.readyState === 4 && xd.status === 200) {
+						c(xd);
 					} 
 				};
 
 				xd.onerror = function() {
-					if (e) {
-						e(xd);
-					}
+					e(xd);
 				};
 
 				xd.send(d);
-
-				window.onbeforeunload = function() {
-					delete xd;
-					xd = null;
-				};
 			},
 			t: function() {
 				if (!!window.WebSocket) {
 					return "websocket";
-				} else {
-					return "longpoll";
 				}
 
 				// TODO: Implement SSE Circuit
@@ -172,18 +104,12 @@ RelayRConnection = (function() {
 			n: function() {
 				var s = this;
 				var t = s.t();
-				web.p(route + "/negotiate?_=" + new Date().getTime(), JSON.stringify({ t: t }), function(result) {
+				web.p(route + "/negotiate", JSON.stringify({ t: t }), function(result) {
 					var obj = JSON.parse(result.responseText);
 					transport.ConnectionId = obj.ConnectionID;
 					setTimeout(function() {
 						transport[t].connect(function(data) {
-							var cobj;
-							if (data.responseText && data.status && data.responseXML) {
-								cobj = JSON.parse(data.responseText);
-							} else {
-								if (data.responseText == "") return;
-								cobj = JSON.parse(data);
-							}
+							var cobj = JSON.parse(data);
 							var lobj = RelayR[cobj.R].client;
 							var args = [];
 							for (var i = 0; i < cobj.A.length; i++) {

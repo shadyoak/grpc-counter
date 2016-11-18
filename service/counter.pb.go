@@ -42,6 +42,13 @@ func (m *CounterValue) String() string            { return proto.CompactTextStri
 func (*CounterValue) ProtoMessage()               {}
 func (*CounterValue) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
+func (m *CounterValue) GetCount() int32 {
+	if m != nil {
+		return m.Count
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*CounterValue)(nil), "service.CounterValue")
 }
@@ -52,7 +59,7 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion3
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Counter service
 
@@ -147,7 +154,7 @@ var _Counter_serviceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: fileDescriptor0,
+	Metadata: "service/counter.proto",
 }
 
 func init() { proto.RegisterFile("service/counter.proto", fileDescriptor0) }

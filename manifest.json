@@ -1,0 +1,22 @@
+{
+    "dependencies": {
+        "github.com/elazarl/go-bindata-assetfs": {
+            "revision": "9a6736ed45b44bf3835afeebb3034b57ed329f3e"
+        },
+        "github.com/golang/protobuf": {
+            "revision": "69b215d01a5606c843240eab4937eab3acee6530"
+        },
+        "github.com/gorilla/websocket": {
+            "version": "^1.1.0"
+        },
+        "github.com/simon-whitehead/relayr": {
+            "version": ">=0.2.1, <1.0.0"
+        },
+        "golang.org/x/net": {
+            "revision": "dd2d9a67c97da0afa00d5726e28086007a0acce5"
+        },
+        "google.golang.org/grpc": {
+            "version": "1.0.5"
+        }
+    }
+}
